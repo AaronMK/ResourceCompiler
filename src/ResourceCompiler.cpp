@@ -155,7 +155,7 @@ int main(int argc, char**argv)
 		std::string strPath = _path.generic_string();
 		strPath = strPath.substr( strPath.find('/') + 1 );
 
-		resource_function << "\t\t" << "if ( 0 == isSame(_path, \"" << strPath << "\") )" << endl
+		resource_function << "\t\t" << "if ( isSame(_path, \"" << strPath << "\") )" << endl
 			<< "\t\t{" << endl 
 			<< "\t\t\tconstexpr std::array<uint8_t, " << file_size << "> objData = {";
 

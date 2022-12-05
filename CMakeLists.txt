@@ -3,7 +3,6 @@
 #
 cmake_minimum_required (VERSION 3.1)
 
-list(APPEND CMAKE_PREFIX_PATH include)
 set(CMAKE_CXX_STANDARD 17)
 
 project (ResourceCompiler)
