@@ -1,15 +1,16 @@
-﻿#include <filesystem>
+﻿#include <array>
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <regex>
 #include <sstream>
 #include <string>
-#include <cstdint>
 
 using namespace std;
 using namespace std::filesystem;
 
-static constexpr char* strResourceClass = 
+constexpr const char* strResourceClass = 
 	"\tclass Resource\n"
 	"\t{\n"
 	"\tprivate:\n"
@@ -33,7 +34,7 @@ static constexpr char* strResourceClass =
 	"\t\t}\n"
 	"\t};";
 
-static constexpr char* strCompareFunctions =
+constexpr const char* strCompareFunctions =
 	"\t\tauto strLength = [](const char* str)\n"
 	"\t\t{\n"
 	"\t\t\tsize_t len = 0;\n"
@@ -59,6 +60,45 @@ static constexpr char* strCompareFunctions =
 	"\n"
 	"\t\t\treturn true;\n"
 	"\t\t};";
+
+static std::string generateFileData(const path& _path, uint32_t block_level)
+{
+	constexpr uint32_t bytes_per_row = 48;
+	std::string block_tabs(block_level, '\t');
+
+	ifstream in_stream(_path, ios_base::binary);
+
+	if ( !in_stream.is_open() )
+		throw runtime_error("Failed to open input file.");
+
+	size_t bytes_remaining = file_size(_path);
+	size_t char_read_count = 0;
+
+	stringstream data_stream;
+	std::array<uint8_t, 4096> in_buffer;
+
+	while ( bytes_remaining > 0 )
+	{
+		size_t bytes_to_read = std::min(in_buffer.size(), bytes_remaining);
+		
+		in_stream.read(
+			(char*)in_buffer.data(),
+			std::min(in_buffer.size(), bytes_remaining)
+		);
+
+		for (size_t i = 0; i < bytes_to_read; ++i)
+		{
+			if ( char_read_count > 0 && (char_read_count % bytes_per_row) == 0 )
+				data_stream << '\n' << block_tabs;
+
+			data_stream << setfill(' ') << setw(3) << in_buffer[i];
+			--bytes_remaining;
+
+			if ( bytes_remaining != 0 )
+				data_stream << ',';
+		}
+	}
+}
 
 static void displayHelp()
 {
