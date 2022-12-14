@@ -7,6 +7,10 @@
 #include <sstream>
 #include <string>
 
+#if __has_include("../resource_out/out.h")
+#	include "../resource_out/out.h"
+#endif
+
 using namespace std;
 using namespace std::filesystem;
 
@@ -77,6 +81,8 @@ static std::string generateFileData(const path& _path, uint32_t block_level)
 	stringstream data_stream;
 	std::array<uint8_t, 4096> in_buffer;
 
+	data_stream << block_tabs;
+
 	while ( bytes_remaining > 0 )
 	{
 		size_t bytes_to_read = std::min(in_buffer.size(), bytes_remaining);
@@ -91,13 +97,16 @@ static std::string generateFileData(const path& _path, uint32_t block_level)
 			if ( char_read_count > 0 && (char_read_count % bytes_per_row) == 0 )
 				data_stream << '\n' << block_tabs;
 
-			data_stream << setfill(' ') << setw(3) << in_buffer[i];
+			data_stream << uint32_t(in_buffer[i]);
 			--bytes_remaining;
+			char_read_count++;
 
 			if ( bytes_remaining != 0 )
-				data_stream << ',';
+				data_stream << ", ";
 		}
 	}
+
+	return data_stream.str();
 }
 
 static void displayHelp()
@@ -154,80 +163,83 @@ int main(int argc, char**argv)
 		return -1;
 	}
 
+	auto isUpdateNeeded = [&]() -> bool
+	{
+		if ( !filesystem::exists(output_file) )
+			return true;
+
+		auto out_last_modified = filesystem::last_write_time(output_file);
+
+		if ( filesystem::last_write_time(input_directory) > out_last_modified )
+			return true;
+
+		for ( auto const& entry : recursive_directory_iterator(input_directory) )
+		{
+			if ( filesystem::last_write_time(entry) > out_last_modified )
+				return true;
+		}
+
+		return false;
+	};
+
+	if ( !isUpdateNeeded() )
+	{
+		cout << "Resource Compiler: Output file is newer than input file(s).  Skipping generation." << endl;
+		return 0;
+	}
+
 	std::string inc_guard_name = std::string(argv[3]);
 	inc_guard_name = std::regex_replace(inc_guard_name, std::regex("::"), "_" );
 	
 	stringstream resource_function;
-	resource_function << "\tstatic constexpr Resource getResource(const char* _path)" << endl << "\t{" << endl
-		<< strCompareFunctions << endl << endl;
+	resource_function << "\tstatic constexpr Resource getResource(const char* _path)\n\t{\n"
+		<< strCompareFunctions;
 	
 	ofstream out_text(output_file.native(), ios::trunc);
-	out_text << "#ifndef _Resource_" << inc_guard_name << "_h_" << endl;
-	out_text << "#define _Resource_" << inc_guard_name << "_h_" << endl << endl;
-	out_text << "#include <exception>" << endl;
-	out_text << "#include <array>" << endl;
-	out_text << "#include <cstdint>" << endl;
-	out_text << "#include <string>" << endl << endl;
-	out_text << "namespace " << argv[3] << endl << "{" << endl;
-	out_text << strResourceClass << endl << endl;
+	out_text << "#ifndef _Resource_" << inc_guard_name << "_h_\n"
+		"#define _Resource_" << inc_guard_name << "_h_\n\n"
+		"#include <array>\n"
+		"#include <cstdint>\n"
+		"#include <stdexcept>\n"
+		"#include <string>\n\n"
+		"namespace " << argv[3] << "\n{\n"
+		<< strResourceClass << "\n\n";
 
-	size_t data_count = 0;
+	std::stringstream data_array;
+	data_array << "\tstatic uint8_t resource_data[] = {\n";
 
-	auto generateSymbolArray = [&](const path& _path)
-	{
-		constexpr size_t bytes_per_row = 48;
-
-		ifstream in_stream;
-		stringstream data_stream;
-
-		in_stream.open(_path, ios_base::binary | ios::ate );
-		size_t file_size = in_stream.tellg();
-		in_stream.seekg(0);
-
-		auto outputByte = [&]()
-		{
-			uint8_t out_byte = 0;
-			in_stream.read((char*)&out_byte, 1);
-
-			data_stream << setfill(' ') << setw(3) << static_cast<uint16_t>(out_byte);
-		};
-
-		std::string strPath = _path.generic_string();
-		strPath = strPath.substr( strPath.find('/') + 1 );
-
-		resource_function << "\t\t" << "if ( isSame(_path, \"" << strPath << "\") )" << endl
-			<< "\t\t{" << endl 
-			<< "\t\t\tconstexpr std::array<uint8_t, " << file_size << "> objData = {";
-
-		for (size_t char_count = 0; char_count < file_size; ++char_count )
-		{
-			if ( 0 == (char_count % bytes_per_row) )
-				data_stream << endl << "\t\t\t\t";
-
-			outputByte();
-
-			if ( char_count < file_size - 1 )
-				data_stream << ", ";
-		}
-
-		resource_function << data_stream.str() << endl << "\t\t\t};" << endl << endl
-			<< "\t\t\treturn Resource(objData.data(), objData.size());"
-			<< endl
-			<< "\t\t}" << endl << endl;
-
-		++data_count;
-	};
+	std::stringstream conditionals_code;
+	size_t bytes_written = 0;
 
 	for ( auto const& entry : recursive_directory_iterator(input_directory) )
 	{
 		if ( entry.is_regular_file() )
-			generateSymbolArray(entry.path());
+		{
+			filesystem::path native_path(entry.path());
+
+			std::string strPath = native_path.generic_string();
+			strPath = strPath.substr( strPath.find('/') + 1 );
+			auto f_size = filesystem::file_size(native_path);
+
+			cout << "Generating data for \'" << strPath << "\"" << std::endl;
+
+			if ( bytes_written != 0 )
+				data_array << ",\n";
+
+			data_array << "\n\t\t// " << strPath << "\n";
+			data_array << generateFileData(native_path, 2);
+
+			conditionals_code << "\n\n\t\t" << "if ( isSame(_path, \"" << strPath << "\") )\n"
+				"\t\t\treturn Resource(&resource_data[" << bytes_written << "], " << f_size << ");";
+
+			bytes_written += filesystem::file_size(native_path);
+		}
 	}
 
-	resource_function << "\t\tthrow std::runtime_error(\"Reource not found.\");" 
-		<< endl << "\t};" << endl;
+	data_array << "\n\t};\n\n";
+	resource_function << conditionals_code.str() << "\n\n\t\tthrow std::runtime_error(\"Reource not found.\");\n\t};\n";
 
-	out_text << resource_function.str() << "}" << endl << "#endif";
+	out_text << data_array.str() << resource_function.str() << "}\n#endif";
 
 	return 0;
 }
