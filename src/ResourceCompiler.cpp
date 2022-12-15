@@ -217,8 +217,9 @@ int main(int argc, char**argv)
 		{
 			filesystem::path native_path(entry.path());
 
-			std::string strPath = native_path.generic_string();
-			strPath = strPath.substr( strPath.find('/') + 1 );
+			auto relative_path = filesystem::relative(native_path, input_directory);
+
+			std::string strPath = relative_path.generic_string();
 			auto f_size = filesystem::file_size(native_path);
 
 			cout << "Generating data for \'" << strPath << "\"" << std::endl;
