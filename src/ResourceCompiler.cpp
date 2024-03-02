@@ -111,8 +111,8 @@ static std::string generateFileData(const path& _path, uint32_t block_level)
 
 static void displayHelp()
 {
-	std::cout << "Syntax for srcrsc: " << endl
-	          << "$srcrsc input_directory output_file namespace [options]" << endl
+	std::cout << "Syntax for compilerc: " << endl
+	          << "$compilerc input_directory output_file namespace [options]" << endl
 	          << "\tinput_directory - the directory containing the files to be compiled into resources" << endl
 	          << "\toutput_directory - the output directory of created source files" << endl
 	          << "\tnamespace - the root namespace of the resource, and the name of the package if cmake is used." << endl
@@ -159,7 +159,7 @@ int main(int argc, char**argv)
 
 	if ( !input_directory.exists() )
 	{
-		cerr << "Error: Input directory does not exist." << endl;
+		cerr << "Error: Input directory does not exist - " << argv[1] << endl;
 		return -1;
 	}
 
