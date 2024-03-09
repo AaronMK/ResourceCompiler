@@ -118,10 +118,6 @@ static void displayHelp()
 	          << "\tnamespace - the root namespace of the resource, and the name of the package if cmake is used." << endl
 	          << endl
 	          << "options:" << endl
-	          << "-cmake <package_name> -" << endl
-	          << "\tgenerates a cmake package in the output directory of the build" << endl
-	          << "\tthat will compile the resources as a static library." << endl
-	          << endl
 	          << "-clean -" << endl
 	          << "Regenerates all sources file from scratch." << endl
 	          << endl

@@ -8,6 +8,16 @@ add_executable(compilerc
 	./src/ResourceCompiler.cpp
 )
 
+set_target_properties(compilerc
+	PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+function(add_resource_directory)
+	set(oneValueArgs INPUT_DIRECTORY NAMESPACE OUT_HEADER)
+
+endfunction()
+
 function(add_resource_header
 	resource_target_name
 	resource_root_dir
